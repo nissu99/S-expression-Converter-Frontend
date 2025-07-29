@@ -1,0 +1,195 @@
+
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S-Expression Converter</title>
+    <script src=".env.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .code-editor {
+            font-family: 'Fira Code', monospace;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            border: 1px solid #333;
+            line-height: 1.6;
+        }
+        .code-output {
+            font-family: 'Fira Code', monospace;
+            background-color: #1e1e1e;
+            color: #a6e22e; /* Green for output */
+            border: 1px solid #333;
+            line-height: 1.6;
+            white-space: pre-wrap; /* Preserve whitespace and wrap long lines */
+            word-wrap: break-word; /* Break long words */
+            overflow-wrap: break-word; /* Modern alternative to word-wrap */
+        }
+        .code-output.error {
+            color: #f92672; /* Pink/Red for errors */
+        }
+        .title {
+            color: #e0e0e0;
+        }
+        .subtitle {
+            color: #888;
+        }
+        .btn {
+            transition: all 0.2s ease-in-out;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        .btn-primary {
+            background-color: #4f46e5;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #4338ca;
+        }
+    </style>
+</head>
+<body class="bg-[#121212] text-gray-300 h-full flex items-center justify-center p-4">
+
+    <div class="w-full max-w-6xl h-full flex flex-col">
+        <!-- Header -->
+        <header class="text-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold title">YAML/JSON to S-Expression Converter</h1>
+        </header>
+
+        <!-- Controls -->
+        <div class="mb-4 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <div class="flex items-center gap-4">
+                <label for="inputType" class="text-lg font-semibold text-gray-400">Input Format:</label>
+                <select id="inputType" class="bg-[#2a2a2a] border border-gray-600 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <option value="yaml" selected>YAML</option>
+                    <option value="json">JSON</option>
+                </select>
+            </div>
+            <button id="convertBtn" class="btn btn-primary font-bold py-2 px-6 rounded-lg shadow-md">
+                Convert
+            </button>
+        </div>
+
+        <!-- Main Content: Converter Panes -->
+        <main class="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 min-h-0">
+            <!-- Input Pane -->
+            <div class="flex flex-col h-full">
+                <label for="input-text" class="text-lg font-semibold mb-2 text-gray-400">Input</label>
+                <textarea id="input-text" class="code-editor w-full flex-grow p-4 rounded-lg shadow-inner resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" spellcheck="false"># Enter YAML or JSON here
+key: value
+items:
+  - item1
+  - 123
+  - true
+nested:
+  another_key: "another value"
+</textarea>
+            </div>
+
+            <!-- Output Pane -->
+            <div class="flex flex-col h-full">
+                <label for="output-text" class="text-lg font-semibold mb-2 text-gray-400">S-Expression Output</label>
+                <div class="code-output w-full flex-grow p-4 rounded-lg shadow-inner overflow-auto">
+                    <pre><code id="output-text"></code></pre>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const convertBtn = document.getElementById('convertBtn');
+        const inputText = document.getElementById('input-text');
+        const outputText = document.getElementById('output-text');
+        const inputTypeSelect = document.getElementById('inputType');
+
+        const API_BASE_URL = window.ENV.API_BASE_URL;
+
+        function formatLongText(text, maxLineLength = 50) {
+            if (!text) return text;
+            
+            const lines = text.split('\n');
+            const formattedLines = [];
+            
+            for (const line of lines) {
+                if (line.length <= maxLineLength) {
+                    formattedLines.push(line);
+                } else {
+                    const words = line.split(' ');
+                    let currentLine = '';
+                    
+                    for (const word of words) {
+                        if ((currentLine + word).length <= maxLineLength) {
+                            currentLine += (currentLine ? ' ' : '') + word;
+                        } else {
+                            if (currentLine) {
+                                formattedLines.push(currentLine);
+                                currentLine = word;
+                            } else {
+                                formattedLines.push(word);
+                            }
+                        }
+                    }
+                    if (currentLine) {
+                        formattedLines.push(currentLine);
+                    }
+                }
+            }
+            
+            return formattedLines.join('\n');
+        }
+
+        async function convert() {
+            const inputType = inputTypeSelect.value;
+            const rawBody = inputText.value;
+            
+            const endpoint = `${API_BASE_URL}/convert/${inputType}`;
+            const contentType = `application/${inputType}`;
+
+            outputText.textContent = 'Converting...';
+            outputText.parentElement.classList.remove('error');
+
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': contentType
+                    },
+                    body: rawBody
+                });
+
+                const resultText = await response.text();
+
+                if (!response.ok) {
+                    throw new Error(resultText);
+                }
+
+                outputText.textContent = formatLongText(resultText);
+
+            } catch (error) {
+                console.error('Conversion failed:', error);
+                outputText.textContent = `Error: ${error.message}`;
+                outputText.parentElement.classList.add('error');
+            }
+        }
+
+        convertBtn.addEventListener('click', convert);
+
+        inputTypeSelect.addEventListener('change', () => {
+            if (inputTypeSelect.value === 'json') {
+                inputText.value = '{\n  "key": "value",\n  "items": [\n    "item1",\n    123,\n    true\n  ],\n  "nested": {\n    "another_key": "another value"\n  }\n}';
+            } else {
+                inputText.value = 'key: value\nitems:\n  - item1\n  - 123\n  - true\nnested:\n  another_key: "another value"';
+            }
+        });
+
+    </script>
+</body>
+</html>
