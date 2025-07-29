@@ -105,12 +105,13 @@ nested:
     </div>
 
     <script>
+        const API_BASE_URL: 'https://exp-s-converter-kcs0.shuttle.app',
         const convertBtn = document.getElementById('convertBtn');
         const inputText = document.getElementById('input-text');
         const outputText = document.getElementById('output-text');
         const inputTypeSelect = document.getElementById('inputType');
 
-        const API_BASE_URL = window.ENV.API_BASE_URL;
+        //const API_BASE_URL = window.ENV.API_BASE_URL;
 
         function formatLongText(text, maxLineLength = 50) {
             if (!text) return text;
